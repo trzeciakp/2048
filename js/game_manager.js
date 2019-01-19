@@ -1,8 +1,10 @@
+function noop() {};
+
 function GameManager(size, InputManager, Actuator, StorageManager) {
   this.size           = size; // Size of the grid
-  this.inputManager   = new InputManager;
-  this.storageManager = new StorageManager;
-  this.actuator       = new Actuator;
+  this.inputManager   = InputManager ? new InputManager : { on: noop };
+  this.storageManager = StorageManager ? new StorageManager : { getGameState: noop, setGameState: noop, getBestScore: noop, clearGameState: noop };
+  this.actuator       = Actuator ? new Actuator : { actuate: noop };
 
   this.startTiles     = 2;
 
@@ -32,6 +34,39 @@ GameManager.prototype.isGameTerminated = function () {
 };
 
 // Set up the game
+GameManager.prototype.createCopy = function() {
+  var copy = new GameManager(this.size);
+  var currentState = this.serialize();
+  copy.grid        = new Grid(currentState.grid.size, currentState.grid.cells);
+  copy.score       = currentState.score;
+  copy.over        = currentState.over;
+  copy.won         = currentState.won;
+  copy.keepPlaying = currentState.keepPlaying;
+  return copy;
+};
+
+GameManager.prototype.dryRun = function(direction, randomMoves) {
+  var copy = this.createCopy();
+  copy.keepPlaying = true;
+  var moved = copy.move(direction);
+
+  if (!moved) {
+    return -1;
+  }
+
+  var sum = 0;
+  for (var i = 0; i < randomMoves; i++) {
+    var copyAfterMove = copy.createCopy();
+    while (!copyAfterMove.over) {
+      var randomDirection = Math.floor(Math.random()*4);
+      copyAfterMove.move(randomDirection);
+      sum += copyAfterMove.score;
+    }
+  }
+
+  return sum;
+};
+
 GameManager.prototype.setup = function () {
   var previousState = this.storageManager.getGameState();
 
@@ -188,6 +223,7 @@ GameManager.prototype.move = function (direction) {
 
     this.actuate();
   }
+  return moved;
 };
 
 // Get the vector representing the chosen direction
